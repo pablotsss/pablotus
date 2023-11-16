@@ -1,5 +1,9 @@
 {
     "prettier.documentSelectors": [
         "Commit"
-    ]
+    ],
+    "editor.unicodeHighlight.allowedLocales": {
+        "": ""
+    },
+    "editor.columnSelection": true
 }

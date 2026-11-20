@@ -202,6 +202,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       <button type="button" class="btn quiet" id="clear-trip">Limpiar</button>
     </div>
     <p class="note" id="trip-status" aria-live="polite"></p>
+
+    <div class="group">
+      <div class="costkm">
+        <h2>Tu regla rápida</h2>
+        <span class="num" id="rule-km">$0</span>
+      </div>
+      <p>Es lo mínimo que debe pagar la oferta por cada km total, sumando la recogida y la vuelta vacía. Memorízalo para decidir sin escribir nada.</p>
+      <p class="note" id="rule-slow"></p>
+    </div>
   </section>
 
   <section class="view" id="view-day" aria-labelledby="tab-day" hidden>
@@ -370,7 +379,12 @@ function renderSettings() {
 }
 
 function renderAll() {
-  $('cost-km').textContent = money(costPerKm(state.cfg));
+  const cfg = state.cfg, perKm = costPerKm(cfg), keep = 1 - Math.min(cfg.taxPct, 90) / 100;
+  $('cost-km').textContent = money(perKm);
+  $('rule-km').textContent = money((perKm + cfg.minKm) / keep);
+  $('rule-slow').textContent = cfg.minKm > 0 && cfg.minHour > 0
+    ? 'En taco, bajo ' + Math.round(cfg.minHour / cfg.minKm) + ' km/h, exige ' + money(perKm / keep) + ' por km más ' + money(cfg.minHour / 60 / keep) + ' por minuto.'
+    : '';
   renderVerdict();
   renderDay();
 }

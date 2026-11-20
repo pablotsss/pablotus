@@ -1,0 +1,506 @@
+<title>Viaje Rentable</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one phone-width column. The verdict stays pinned on top while the driver types. */
+:root {
+  --bg: #EDF1F2;
+  --surface: #FFFFFF;
+  --ink: #12262C;
+  --muted: #56707A;
+  --line: #CBD7DB;
+  --accent: #0B6477;
+  --accent-ink: #FFFFFF;
+  --go: #177A43;
+  --wait: #8A5A0A;
+  --stop: #B3312A;
+  --idle: #4F6A74;
+  --on-state: #FFFFFF;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1A1F; --surface: #142830; --ink: #E6EFF1; --muted: #93AAB2; --line: #2B4650;
+    --accent: #4FB6C9; --accent-ink: #06222A;
+    --go: #1B8A4E; --wait: #9A6812; --stop: #C0413A; --idle: #2B4650; --on-state: #FFFFFF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1A1F; --surface: #142830; --ink: #E6EFF1; --muted: #93AAB2; --line: #2B4650;
+  --accent: #4FB6C9; --accent-ink: #06222A;
+  --go: #1B8A4E; --wait: #9A6812; --stop: #C0413A; --idle: #2B4650; --on-state: #FFFFFF;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 32px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 10;
+  height: env(safe-area-inset-top, 0px); background: var(--bg);
+}
+.app { max-width: 30rem; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+h1, h2, .num { font-family: var(--display); }
+h1 { margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+h2 { margin: 0; font-size: 1.0625rem; font-weight: 700; }
+p { margin: 0; }
+.sub, .note, .unit, .sync { color: var(--muted); font-size: 0.875rem; }
+.num { font-variant-numeric: tabular-nums; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; background: var(--line); border-radius: 12px; }
+.tabs button {
+  min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--ink);
+  font: 600 0.9375rem var(--body); cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--accent); }
+
+.view { display: flex; flex-direction: column; gap: 16px; }
+
+.verdict {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px 16px; border-radius: 14px;
+  background: var(--idle); color: var(--on-state);
+  transition: background-color 0.15s;
+}
+.verdict[data-state="go"] { background: var(--go); }
+.verdict[data-state="wait"] { background: var(--wait); }
+.verdict[data-state="stop"] { background: var(--stop); }
+.verdict-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.verdict-word { font: 700 2rem/1 var(--display); text-transform: uppercase; letter-spacing: 0.02em; }
+.verdict-net { font: 700 1.5rem/1 var(--display); font-variant-numeric: tabular-nums; }
+.verdict-why { font-size: 0.9375rem; }
+.figures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
+.figures div { min-width: 0; }
+.figures dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85; }
+.figures dd { margin: 0; font: 700 1.0625rem var(--display); font-variant-numeric: tabular-nums; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field.wide { grid-column: 1 / -1; }
+.field label { font-size: 0.875rem; font-weight: 500; }
+.input {
+  display: flex; align-items: center; gap: 6px; padding: 0 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+}
+.input:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.input input {
+  flex: 1; min-width: 0; width: 100%; height: 48px; border: 0; outline: 0; background: transparent;
+  color: var(--ink); font: 500 1.125rem var(--display); font-variant-numeric: tabular-nums;
+}
+.unit { white-space: nowrap; }
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  flex: 1; min-height: 48px; padding: 0 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  font: 600 1rem var(--body);
+}
+.btn.quiet { flex: 0 1 auto; background: transparent; color: var(--accent); }
+.btn.small { flex: 0 0 auto; min-height: 36px; padding: 0 12px; font-size: 0.875rem; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#settings-form { display: flex; flex-direction: column; gap: 16px; }
+.group { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+.costkm { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.costkm .num { font-size: 1.75rem; font-weight: 700; }
+
+.today { display: flex; flex-direction: column; gap: 8px; }
+.today .num.big { font-size: 2.25rem; font-weight: 700; line-height: 1.1; }
+.bar { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0; background: var(--accent); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0; }
+.stats div { min-width: 0; }
+.stats dt { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stats dd { margin: 0; font: 700 1.0625rem var(--display); font-variant-numeric: tabular-nums; }
+.trips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.trips li {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.trips .what { min-width: 0; }
+.trips .net { font: 700 1.0625rem var(--display); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) { .verdict { transition: none; } }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Viaje Rentable</h1>
+    <p class="sub">Volkswagen Nivus Highline 2023 · Antofagasta</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Secciones">
+    <button type="button" role="tab" id="tab-trip" data-view="trip" aria-selected="true">Viaje</button>
+    <button type="button" role="tab" id="tab-day" data-view="day" aria-selected="false">Mi día</button>
+    <button type="button" role="tab" id="tab-settings" data-view="settings" aria-selected="false">Ajustes</button>
+  </nav>
+
+  <section class="view" id="view-trip" aria-labelledby="tab-trip">
+    <div class="verdict" id="verdict" data-state="idle" aria-live="polite">
+      <div class="verdict-top">
+        <span class="verdict-word" id="verdict-word">Sin datos</span>
+        <span class="verdict-net" id="verdict-net"></span>
+      </div>
+      <p class="verdict-why" id="verdict-why"></p>
+      <dl class="figures">
+        <div><dt>Por hora</dt><dd id="fig-hour">–</dd></div>
+        <div><dt>Por km</dt><dd id="fig-km">–</dd></div>
+        <div><dt>Costo auto</dt><dd id="fig-cost">–</dd></div>
+      </dl>
+    </div>
+
+    <p class="note" id="example-note" hidden>Oferta de ejemplo. Reemplázala por la que te muestra Uber.</p>
+
+    <form class="fields" id="trip-form" autocomplete="off">
+      <div class="field wide">
+        <label for="fare">Tarifa que te ofrece Uber</label>
+        <div class="input"><span class="unit">$</span><input id="fare" data-kind="money" inputmode="numeric"></div>
+      </div>
+      <div class="field">
+        <label for="pickup-km">Km hasta el pasajero</label>
+        <div class="input"><input id="pickup-km" inputmode="decimal"><span class="unit">km</span></div>
+      </div>
+      <div class="field">
+        <label for="pickup-min">Minutos hasta el pasajero</label>
+        <div class="input"><input id="pickup-min" inputmode="decimal"><span class="unit">min</span></div>
+      </div>
+      <div class="field">
+        <label for="trip-km">Km del viaje</label>
+        <div class="input"><input id="trip-km" inputmode="decimal"><span class="unit">km</span></div>
+      </div>
+      <div class="field">
+        <label for="trip-min">Minutos del viaje</label>
+        <div class="input"><input id="trip-min" inputmode="decimal"><span class="unit">min</span></div>
+      </div>
+      <div class="field wide">
+        <label for="return-km">Km de vuelta sin pasajero</label>
+        <div class="row">
+          <div class="input" style="flex:1"><input id="return-km" inputmode="decimal" placeholder="0"><span class="unit">km</span></div>
+          <button type="button" class="btn quiet" id="same-return">Igual al viaje</button>
+        </div>
+        <p class="note">Úsalo en viajes al aeropuerto, La Negra o Mejillones. El tiempo de vuelta se calcula a la misma velocidad del viaje.</p>
+      </div>
+    </form>
+
+    <div class="row">
+      <button type="button" class="btn" id="log-trip">Registrar viaje aceptado</button>
+      <button type="button" class="btn quiet" id="clear-trip">Limpiar</button>
+    </div>
+    <p class="note" id="trip-status" aria-live="polite"></p>
+  </section>
+
+  <section class="view" id="view-day" aria-labelledby="tab-day" hidden>
+    <div class="today">
+      <h2>Ganancia de hoy</h2>
+      <p class="num big" id="day-net">$0</p>
+      <div class="bar" aria-hidden="true"><span id="day-bar"></span></div>
+      <p id="day-goal"></p>
+      <p class="note" id="day-detail"></p>
+    </div>
+    <dl class="stats">
+      <div><dt>Viajes</dt><dd id="st-count">0</dd></div>
+      <div><dt>Km</dt><dd id="st-km">0</dd></div>
+      <div><dt>Tiempo</dt><dd id="st-time">0 min</dd></div>
+      <div><dt>Por hora</dt><dd id="st-hour">–</dd></div>
+    </dl>
+    <p class="note" id="day-empty">Aún no registras viajes hoy. Evalúa una oferta en Viaje y toca Registrar viaje aceptado.</p>
+    <ul class="trips" id="trip-list"></ul>
+  </section>
+
+  <section class="view" id="view-settings" aria-labelledby="tab-settings" hidden>
+    <div class="costkm">
+      <h2>Tu costo por km</h2>
+      <span class="num" id="cost-km">$0</span>
+    </div>
+    <p class="note">Bencina más desgaste. Es lo que te cuesta mover el auto un kilómetro, con o sin pasajero.</p>
+    <div id="settings-form"></div>
+  </section>
+
+  <p class="sync" id="sync"></p>
+</div>
+
+<script>
+const DEFAULTS = {
+  fuel: 1630, kmPerL: 11.5, service: 25, tyres: 8, wear: 40,
+  minHour: 6000, minKm: 250, taxPct: 0,
+  days: 2.5, hours: 5, goal: 30000,
+  insurance: 45000, loan: 0, permit: 300000, soap: 30000, other: 0, uberPct: 50
+};
+const EXAMPLE = { 'fare': '4200', 'pickup-km': '1,5', 'pickup-min': '5', 'trip-km': '6', 'trip-min': '15', 'return-km': '' };
+const GROUPS = [
+  { title: 'Bencina', note: 'Precio de referencia nacional de noviembre de 2026. Pon el de tu bencinera.',
+    fields: [['fuel', 'Precio por litro', '$', 'money'], ['kmPerL', 'Rendimiento en ciudad', 'km/L', 'dec']] },
+  { title: 'Desgaste por km', note: 'Estimaciones para el Nivus 1.0 TSI. Ajústalas con tus boletas de mantención.',
+    fields: [['service', 'Mantención', '$/km', 'money'], ['tyres', 'Neumáticos', '$/km', 'money'], ['wear', 'Pérdida de valor', '$/km', 'money']] },
+  { title: 'Tus mínimos', note: 'Un viaje se acepta cuando supera los dos mínimos.',
+    fields: [['minHour', 'Ganancia por hora', '$', 'money'], ['minKm', 'Ganancia por km', '$', 'money'], ['taxPct', 'Reserva para impuestos', '% de la tarifa', 'dec']] },
+  { title: 'Tu jornada', note: '',
+    fields: [['days', 'Días por semana', 'días', 'dec'], ['hours', 'Horas por día', 'h', 'dec'], ['goal', 'Meta libre por día', '$', 'money']] },
+  { title: 'Costos fijos', note: 'No cambian el veredicto de un viaje. Se cargan a tu meta diaria.',
+    fields: [['insurance', 'Seguro', '$ al mes', 'money'], ['loan', 'Cuota del crédito', '$ al mes', 'money'], ['permit', 'Permiso de circulación', '$ al año', 'money'],
+             ['soap', 'SOAP y revisión técnica', '$ al año', 'money'], ['other', 'Otros', '$ al mes', 'money'], ['uberPct', 'Parte que cargas a Uber', '%', 'dec']] }
+];
+const STORE_KEY = 'viaje-rentable';
+const WEEKS_PER_MONTH = 4.345;
+const $ = id => document.getElementById(id);
+
+let state = { cfg: { ...DEFAULTS }, example: true, day: today(), trips: [], ts: 0 };
+
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function group(n) { return String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+function money(n) { return (Math.round(n) < 0 ? '−$' : '$') + group(n); }
+function dec(n) { return (Math.round(n * 10) / 10).toString().replace('.', ','); }
+function parse(el) {
+  const v = el.value.trim();
+  if (el.dataset.kind === 'money') return parseInt(v.replace(/\D/g, ''), 10) || 0;
+  return Math.max(0, parseFloat(v.replace(',', '.')) || 0);
+}
+
+function costPerKm(cfg) {
+  return (cfg.kmPerL > 0 ? cfg.fuel / cfg.kmPerL : 0) + cfg.service + cfg.tyres + cfg.wear;
+}
+function fixedPerDay(cfg) {
+  const monthly = cfg.insurance + cfg.loan + cfg.other + (cfg.permit + cfg.soap) / 12;
+  return cfg.days > 0 ? monthly * cfg.uberPct / 100 / (cfg.days * WEEKS_PER_MONTH) : 0;
+}
+
+// The fixed costs stay out of this decision: the driver pays them with or without the trip.
+function evaluate(o, cfg) {
+  const km = o.pickupKm + o.tripKm + o.returnKm;
+  const returnMin = o.returnKm * (o.tripKm > 0 ? o.tripMin / o.tripKm : 2);
+  const min = o.pickupMin + o.tripMin + returnMin;
+  if (!(o.fare > 0 && o.tripKm > 0 && min > 0)) return { state: 'idle' };
+  const tax = Math.min(cfg.taxPct, 90) / 100;
+  const cost = km * costPerKm(cfg);
+  const net = o.fare * (1 - tax) - cost;
+  const hours = min / 60;
+  const perHour = net / hours;
+  const perKm = net / km;
+  const ratio = Math.min(cfg.minHour > 0 ? perHour / cfg.minHour : Infinity, cfg.minKm > 0 ? perKm / cfg.minKm : Infinity);
+  const needed = Math.max(cfg.minHour * hours, cfg.minKm * km);
+  const minFare = Math.ceil((cost + needed) / (1 - tax) / 100) * 100;
+  return { state: ratio >= 1 ? 'go' : ratio >= 0.8 ? 'wait' : 'stop', km, min, cost, net, perHour, perKm, minFare };
+}
+
+function readOffer() {
+  return {
+    fare: parse($('fare')), pickupKm: parse($('pickup-km')), pickupMin: parse($('pickup-min')),
+    tripKm: parse($('trip-km')), tripMin: parse($('trip-min')), returnKm: parse($('return-km'))
+  };
+}
+
+function renderVerdict() {
+  const offer = readOffer();
+  const r = evaluate(offer, state.cfg);
+  const cfg = state.cfg;
+  $('verdict').dataset.state = r.state;
+  $('example-note').hidden = !state.example;
+  $('log-trip').disabled = r.state === 'idle' || state.example;
+  if (r.state === 'idle') {
+    $('verdict-word').textContent = 'Sin datos';
+    $('verdict-net').textContent = '';
+    $('verdict-why').textContent = 'Ingresa la tarifa, los km y los minutos de la oferta.';
+    $('fig-hour').textContent = $('fig-km').textContent = $('fig-cost').textContent = '–';
+    return null;
+  }
+  $('verdict-word').textContent = { go: 'Aceptar', wait: 'Dudoso', stop: 'Rechazar' }[r.state];
+  $('verdict-net').textContent = (r.net < 0 ? 'Pierdes ' : 'Ganas ') + '$' + group(r.net);
+  $('fig-hour').textContent = money(r.perHour);
+  $('fig-km').textContent = money(r.perKm);
+  $('fig-cost').textContent = money(r.cost);
+  const from = ' Conviene desde ' + money(r.minFare) + '.';
+  $('verdict-why').textContent =
+    r.state === 'go' ? 'Supera tus mínimos de ' + money(cfg.minHour) + ' por hora y ' + money(cfg.minKm) + ' por km.'
+    : r.net <= 0 ? 'El costo del auto supera la tarifa.' + from
+    : r.state === 'wait' ? 'Queda a menos de 20% de tus mínimos.' + from
+    : 'No alcanza tus mínimos de ' + money(cfg.minHour) + ' por hora y ' + money(cfg.minKm) + ' por km.' + from;
+  return { offer, r };
+}
+
+function renderDay() {
+  const cfg = state.cfg;
+  const net = state.trips.reduce((s, t) => s + t.net, 0);
+  const km = state.trips.reduce((s, t) => s + t.km, 0);
+  const min = state.trips.reduce((s, t) => s + t.min, 0);
+  const fixed = fixedPerDay(cfg);
+  const target = fixed + cfg.goal;
+  $('day-net').textContent = money(net);
+  $('day-bar').style.width = (target > 0 ? Math.max(0, Math.min(100, net / target * 100)) : 0) + '%';
+  $('day-goal').textContent = net >= target
+    ? 'Meta cumplida. Llevas ' + money(net - fixed) + ' libres después de los costos fijos.'
+    : 'Te faltan ' + money(target - net) + ' para cubrir los costos fijos y tu meta.';
+  $('day-detail').textContent = 'Costos fijos del día: ' + money(fixed) + '. Meta libre: ' + money(cfg.goal) + '.'
+    + (cfg.hours > 0 ? ' Necesitas promediar ' + money(target / cfg.hours) + ' por hora en tus ' + dec(cfg.hours) + ' horas, contando las esperas.' : '');
+  $('st-count').textContent = state.trips.length;
+  $('st-km').textContent = dec(km);
+  $('st-time').textContent = min >= 60 ? Math.floor(min / 60) + ' h ' + Math.round(min % 60) + ' min' : Math.round(min) + ' min';
+  $('st-hour').textContent = min > 0 ? money(net / (min / 60)) : '–';
+  $('day-empty').hidden = state.trips.length > 0;
+  $('trip-list').innerHTML = state.trips.map((t, i) =>
+    '<li><div class="what"><div>' + t.at + ' · tarifa ' + money(t.fare) + '</div><div class="note">' + dec(t.km) + ' km · ' + Math.round(t.min) + ' min</div></div>'
+    + '<span class="net">' + money(t.net) + '</span>'
+    + '<button type="button" class="btn quiet small" data-remove="' + i + '">Quitar</button></li>').join('');
+}
+
+function renderSettings() {
+  $('settings-form').innerHTML = GROUPS.map(g =>
+    '<div class="group"><h2>' + g.title + '</h2>' + (g.note ? '<p class="note">' + g.note + '</p>' : '') + '<div class="fields">'
+    + g.fields.map(([key, label, unit, kind]) =>
+      '<div class="field"><label for="cfg-' + key + '">' + label + '</label><div class="input"><input id="cfg-' + key + '" data-key="' + key + '" data-kind="' + kind
+      + '" inputmode="' + (kind === 'money' ? 'numeric' : 'decimal') + '" value="' + (kind === 'money' ? group(state.cfg[key]) : dec(state.cfg[key])) + '"><span class="unit">' + unit + '</span></div></div>').join('')
+    + '</div></div>').join('');
+}
+
+function renderAll() {
+  $('cost-km').textContent = money(costPerKm(state.cfg));
+  renderVerdict();
+  renderDay();
+}
+
+function fillTrip(values) {
+  for (const id in values) $(id).value = values[id];
+}
+
+/* ---------- Storage: this phone first, then the account when the page can reach it ---------- */
+let docRef = null, saving = false, queued = false, timer = 0;
+
+function normalise(s) {
+  const cfg = { ...DEFAULTS };
+  for (const k in DEFAULTS) if (s && s.cfg && typeof s.cfg[k] === 'number' && isFinite(s.cfg[k])) cfg[k] = s.cfg[k];
+  const sameDay = s && s.day === today() && Array.isArray(s.trips);
+  return { cfg, example: !s || s.example !== false, day: today(), trips: sameDay ? s.trips : [], ts: (s && s.ts) || 0 };
+}
+function saveLocal() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+function setSync(where) {
+  $('sync').textContent = where === 'account' ? 'Tus datos se guardan en tu cuenta.' : 'Tus datos se guardan solo en este dispositivo.';
+}
+function persist() {
+  state.ts = Date.now();
+  saveLocal();
+  if (docRef) { clearTimeout(timer); timer = setTimeout(upload, 900); }
+}
+async function upload() {
+  if (!docRef) return;
+  if (saving) { queued = true; return; }
+  saving = true;
+  try {
+    await docRef.set(JSON.parse(JSON.stringify(state)));
+    setSync('account');
+  } catch (e) {
+    if (!e || e.code !== 'unavailable') docRef = null;
+    setSync('phone');
+  }
+  saving = false;
+  if (queued) { queued = false; upload(); }
+}
+async function connect() {
+  setSync('phone');
+  if (!window.claude || !window.claude.use) return;
+  try {
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) return;
+    const ref = db.doc('data/users/' + uid + '/estado');
+    const snap = await ref.get();
+    const remote = snap.exists ? snap.data() : null;
+    docRef = ref;
+    setSync('account');
+    if (remote && remote.ts > state.ts) {
+      state = normalise(JSON.parse(JSON.stringify(remote)));
+      saveLocal();
+      renderSettings();
+      renderAll();
+    } else if (state.ts > 0) {
+      upload();
+    }
+  } catch (e) {}
+}
+
+/* ---------- Events ---------- */
+document.querySelector('.tabs').addEventListener('click', e => {
+  const tab = e.target.closest('button[data-view]');
+  if (!tab) return;
+  for (const b of document.querySelectorAll('.tabs button')) {
+    const on = b === tab;
+    b.setAttribute('aria-selected', on);
+    $('view-' + b.dataset.view).hidden = !on;
+  }
+});
+
+$('trip-form').addEventListener('input', () => {
+  if (state.example) { state.example = false; persist(); }
+  $('trip-status').textContent = '';
+  renderVerdict();
+});
+$('trip-form').addEventListener('submit', e => e.preventDefault());
+
+$('same-return').addEventListener('click', () => {
+  $('return-km').value = $('trip-km').value;
+  $('trip-form').dispatchEvent(new Event('input'));
+});
+
+function clearTrip() {
+  fillTrip({ 'fare': '', 'pickup-km': '', 'pickup-min': '', 'trip-km': '', 'trip-min': '', 'return-km': '' });
+  if (state.example) { state.example = false; persist(); }
+  renderVerdict();
+}
+$('clear-trip').addEventListener('click', () => { clearTrip(); $('trip-status').textContent = ''; $('fare').focus(); });
+
+$('log-trip').addEventListener('click', () => {
+  const res = renderVerdict();
+  if (!res) return;
+  if (state.day !== today()) { state.day = today(); state.trips = []; }
+  const now = new Date();
+  state.trips.push({
+    at: String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'),
+    fare: res.offer.fare, net: Math.round(res.r.net), km: res.r.km, min: res.r.min
+  });
+  persist();
+  clearTrip();
+  renderDay();
+  $('trip-status').textContent = 'Viaje registrado. Llevas ' + money(state.trips.reduce((s, t) => s + t.net, 0)) + ' hoy.';
+});
+
+$('trip-list').addEventListener('click', e => {
+  const b = e.target.closest('button[data-remove]');
+  if (!b) return;
+  state.trips.splice(Number(b.dataset.remove), 1);
+  persist();
+  renderDay();
+});
+
+$('settings-form').addEventListener('input', e => {
+  const key = e.target.dataset.key;
+  if (!key) return;
+  state.cfg[key] = parse(e.target);
+  persist();
+  renderAll();
+});
+
+/* ---------- Start ---------- */
+try { state = normalise(JSON.parse(localStorage.getItem(STORE_KEY))); } catch (e) { state = normalise(null); }
+if (state.example) fillTrip(EXAMPLE);
+renderSettings();
+renderAll();
+connect();
+</script>
